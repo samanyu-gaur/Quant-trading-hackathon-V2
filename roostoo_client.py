@@ -153,7 +153,19 @@ class RoostooClient:
             Dict like {"BTC": {"Free": 0.5, "Lock": 0.1}, "USD": {...}}
         """
         data = self._get("/v3/balance", signed=True)
-        return data.get("Wallet", {})
+
+        # Roostoo schema variants seen in docs/runtime:
+        # 1) {"Wallet": {...}} (legacy/docs)
+        # 2) {"SpotWallet": {...}, "MarginWallet": {...}} (current API)
+        wallet = data.get("Wallet")
+        if isinstance(wallet, dict):
+            return wallet
+
+        spot_wallet = data.get("SpotWallet")
+        if isinstance(spot_wallet, dict):
+            return spot_wallet
+
+        return {}
 
     def get_portfolio_value(self) -> float:
         """Compute total portfolio value in USD."""

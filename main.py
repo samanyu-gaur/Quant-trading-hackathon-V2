@@ -25,7 +25,7 @@ import signal
 import sys
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -39,6 +39,89 @@ from executor import TradeExecutor, TradeOrder
 from risk_manager import RiskManager
 
 logger = logging.getLogger(__name__)
+
+
+class RoostooSpecClient(RoostooClient):
+    """Roostoo client adapter that normalizes README2 API response shapes.
+
+    README2 defines ticker payloads under "Data" and trade payloads under
+    "OrderDetail". The bot/executor pipeline expects flatter dicts, so this
+    adapter bridges those formats without changing trading logic.
+    """
+
+    def ticker(self, pair: str = None) -> Dict[str, Dict[str, Any]]:
+        """Return ticker map keyed by pair, regardless of raw response shape."""
+        raw = super().ticker(pair=pair)
+        if not isinstance(raw, dict):
+            return {}
+
+        if "Data" in raw and isinstance(raw["Data"], dict):
+            return raw["Data"]
+
+        # Fallback for non-wrapped payloads.
+        return raw
+
+    def get_all_prices(self) -> Dict[str, float]:
+        """Get latest prices from ticker map with README2-compatible parsing."""
+        data = self.ticker()
+        prices: Dict[str, float] = {}
+        for pair_name, ticker_data in data.items():
+            if not isinstance(ticker_data, dict):
+                continue
+            last_price = ticker_data.get("LastPrice")
+            if last_price is None:
+                continue
+            try:
+                prices[pair_name] = float(last_price)
+            except (TypeError, ValueError):
+                continue
+        return prices
+
+    def place_order(self, pair: str, side: str, quantity: float,
+                    order_type: str = "MARKET", price: float = None) -> Dict:
+        """Place order and return a flattened order dict for executor compatibility."""
+        raw = super().place_order(
+            pair=pair,
+            side=side,
+            quantity=quantity,
+            order_type=order_type,
+            price=price,
+        )
+
+        if not isinstance(raw, dict):
+            return {}
+
+        detail = raw.get("OrderDetail")
+        if not isinstance(detail, dict):
+            return raw
+
+        # Preserve legacy key access expected by executor while keeping raw fields.
+        normalized = dict(detail)
+        normalized["Success"] = raw.get("Success")
+        normalized["ErrMsg"] = raw.get("ErrMsg", "")
+        if "FilledAverPrice" not in normalized and "Price" in normalized:
+            normalized["FilledAverPrice"] = normalized.get("Price", 0)
+        return normalized
+
+    def query_orders(self, order_id: int = None, pair: str = None,
+                     pending_only: bool = False, limit: int = 100) -> List[Dict]:
+        """Return list of matched orders from README2 query payload shape."""
+        data = {"limit": limit}
+        if order_id:
+            data["order_id"] = order_id
+        elif pair:
+            data["pair"] = pair
+            if pending_only:
+                data["pending_only"] = "TRUE"
+
+        result = self._post("/v3/query_order", data)
+        if isinstance(result, dict):
+            matched = result.get("OrderMatched", [])
+            if isinstance(matched, list):
+                return matched
+        if isinstance(result, list):
+            return result
+        return []
 
 # ── Graceful shutdown ──
 _shutdown = False
@@ -156,7 +239,7 @@ class TradingBot:
     """Main trading bot orchestrating all components."""
 
     def __init__(self):
-        self.client = RoostooClient()
+        self.client = RoostooSpecClient()
         self.data_engine = DataEngine()
         self.alpha_engine = AlphaEngine()
         self.optimizer = PortfolioOptimizer()
@@ -235,6 +318,11 @@ class TradingBot:
 
             nav = self.client.get_portfolio_value()
             logger.info("Portfolio value: $%.2f", nav)
+            if nav <= 0:
+                logger.warning(
+                    "Connected successfully, but wallet appears unfunded (NAV <= 0). "
+                    "Bot will skip live trading until account has USD/coin balance."
+                )
 
             return True
         except Exception as e:
@@ -301,6 +389,22 @@ class TradingBot:
 
         logger.info("NAV: $%.2f | USD: $%.2f | Positions: %d",
                      nav, usd_balance, len(holdings))
+
+        if nav <= 0 or (usd_balance <= 0 and len(holdings) == 0):
+            logger.warning(
+                "No funded wallet detected (NAV=$%.2f, USD=$%.2f, positions=%d). "
+                "Skipping cycle; no orders can be sized without capital.",
+                nav,
+                usd_balance,
+                len(holdings),
+            )
+            return {
+                "status": "SKIPPED",
+                "reason": "no_funded_wallet",
+                "nav": nav,
+                "usd_balance": usd_balance,
+                "positions": len(holdings),
+            }
 
         # Update risk tracking
         self.risk_mgr.update_nav(nav)
