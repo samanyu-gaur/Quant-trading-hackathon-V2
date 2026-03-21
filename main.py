@@ -316,6 +316,18 @@ class TradingBot:
             wallet = self.client.balance()
             logger.info("Wallet: %s", json.dumps(wallet, indent=2))
 
+            if not wallet:
+                try:
+                    raw_balance = self.client._get("/v3/balance", signed=True)
+                    logger.warning(
+                        "Balance endpoint returned empty parsed wallet. Raw keys=%s Success=%s ErrMsg=%s",
+                        list(raw_balance.keys()) if isinstance(raw_balance, dict) else type(raw_balance).__name__,
+                        raw_balance.get("Success") if isinstance(raw_balance, dict) else None,
+                        raw_balance.get("ErrMsg") if isinstance(raw_balance, dict) else None,
+                    )
+                except Exception as diag_err:
+                    logger.warning("Failed to fetch raw balance diagnostics: %s", diag_err)
+
             nav = self.client.get_portfolio_value()
             logger.info("Portfolio value: $%.2f", nav)
             if nav <= 0:
@@ -391,6 +403,17 @@ class TradingBot:
                      nav, usd_balance, len(holdings))
 
         if nav <= 0 or (usd_balance <= 0 and len(holdings) == 0):
+            try:
+                raw_balance = self.client._get("/v3/balance", signed=True)
+                logger.warning(
+                    "Balance diagnostics: keys=%s Success=%s ErrMsg=%s",
+                    list(raw_balance.keys()) if isinstance(raw_balance, dict) else type(raw_balance).__name__,
+                    raw_balance.get("Success") if isinstance(raw_balance, dict) else None,
+                    raw_balance.get("ErrMsg") if isinstance(raw_balance, dict) else None,
+                )
+            except Exception as diag_err:
+                logger.warning("Balance diagnostics failed: %s", diag_err)
+
             logger.warning(
                 "No funded wallet detected (NAV=$%.2f, USD=$%.2f, positions=%d). "
                 "Skipping cycle; no orders can be sized without capital.",
