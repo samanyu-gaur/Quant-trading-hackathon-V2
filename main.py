@@ -318,6 +318,11 @@ class TradingBot:
 
             nav = self.client.get_portfolio_value()
             logger.info("Portfolio value: $%.2f", nav)
+            if nav <= 0:
+                logger.warning(
+                    "Connected successfully, but wallet appears unfunded (NAV <= 0). "
+                    "Bot will skip live trading until account has USD/coin balance."
+                )
 
             return True
         except Exception as e:
@@ -384,6 +389,22 @@ class TradingBot:
 
         logger.info("NAV: $%.2f | USD: $%.2f | Positions: %d",
                      nav, usd_balance, len(holdings))
+
+        if nav <= 0 or (usd_balance <= 0 and len(holdings) == 0):
+            logger.warning(
+                "No funded wallet detected (NAV=$%.2f, USD=$%.2f, positions=%d). "
+                "Skipping cycle; no orders can be sized without capital.",
+                nav,
+                usd_balance,
+                len(holdings),
+            )
+            return {
+                "status": "SKIPPED",
+                "reason": "no_funded_wallet",
+                "nav": nav,
+                "usd_balance": usd_balance,
+                "positions": len(holdings),
+            }
 
         # Update risk tracking
         self.risk_mgr.update_nav(nav)
