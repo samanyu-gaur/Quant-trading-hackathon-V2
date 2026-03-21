@@ -34,6 +34,19 @@ class RoostooClient:
         # Cache exchange info
         self._exchange_info: Optional[Dict] = None
 
+    @staticmethod
+    def _ensure_success(endpoint: str, data: Any, allow_success_false: bool = False) -> Dict:
+        """Validate top-level API status and return a dict payload."""
+        if not isinstance(data, dict):
+            raise RuntimeError(f"{endpoint} returned non-JSON payload: {type(data).__name__}")
+
+        success = data.get("Success")
+        if success is False and not allow_success_false:
+            err = data.get("ErrMsg") or "Unknown API error"
+            raise RuntimeError(f"{endpoint} failed: {err}")
+
+        return data
+
     def _timestamp(self) -> int:
         """Current time in milliseconds."""
         return int(time.time() * 1000)
@@ -94,7 +107,7 @@ class RoostooClient:
 
     def server_time(self) -> int:
         """Get server time in milliseconds."""
-        data = self._get("/v3/serverTime")
+        data = self._ensure_success("/v3/serverTime", self._get("/v3/serverTime"))
         return data.get("ServerTime", self._timestamp())
 
     def exchange_info(self, force_refresh: bool = False) -> Dict:
@@ -103,7 +116,8 @@ class RoostooClient:
         Returns cached data unless force_refresh=True.
         """
         if self._exchange_info is None or force_refresh:
-            self._exchange_info = self._get("/v3/exchangeInfo")
+            raw = self._ensure_success("/v3/exchangeInfo", self._get("/v3/exchangeInfo"))
+            self._exchange_info = raw.get("Data", raw)
         return self._exchange_info
 
     def get_trading_pairs(self) -> Dict[str, Dict]:
@@ -128,7 +142,8 @@ class RoostooClient:
         params = {}
         if pair:
             params["pair"] = pair
-        return self._get("/v3/ticker", params=params)
+        raw = self._ensure_success("/v3/ticker", self._get("/v3/ticker", params=params))
+        return raw.get("Data", raw)
 
     def get_all_prices(self) -> Dict[str, float]:
         """Get latest prices for all trading pairs.
@@ -152,7 +167,7 @@ class RoostooClient:
         Returns:
             Dict like {"BTC": {"Free": 0.5, "Lock": 0.1}, "USD": {...}}
         """
-        data = self._get("/v3/balance", signed=True)
+        data = self._ensure_success("/v3/balance", self._get("/v3/balance", signed=True))
 
         # Roostoo schema variants seen in docs/runtime:
         # 1) {"Wallet": {...}} (legacy/docs)
@@ -190,7 +205,12 @@ class RoostooClient:
 
     def pending_count(self) -> Dict:
         """Get count of pending orders."""
-        return self._get("/v3/pending_count", signed=True)
+        # This endpoint returns Success=false for "no pending order"; keep payload as-is.
+        return self._ensure_success(
+            "/v3/pending_count",
+            self._get("/v3/pending_count", signed=True),
+            allow_success_false=True,
+        )
 
     # ── Trading endpoints (signed) ──
 
@@ -219,7 +239,8 @@ class RoostooClient:
 
         logger.info("Placing %s %s %s qty=%.6f price=%s",
                      order_type, side, pair, quantity, price)
-        result = self._post("/v3/place_order", data)
+        result = self._ensure_success("/v3/place_order", self._post("/v3/place_order", data))
+        result = result.get("OrderDetail", result)
         logger.info("Order result: ID=%s Status=%s Filled=%.6f",
                      result.get("OrderID"), result.get("Status"),
                      float(result.get("FilledQuantity", 0)))
@@ -261,7 +282,7 @@ class RoostooClient:
             data["pair"] = pair
         if pending_only:
             data["pending_only"] = "TRUE"
-        result = self._post("/v3/query_order", data)
+        result = self._ensure_success("/v3/query_order", self._post("/v3/query_order", data))
         return result if isinstance(result, list) else result.get("OrderMatched", [])
 
     def cancel_order(self, order_id: int = None, pair: str = None) -> Dict:
@@ -281,7 +302,7 @@ class RoostooClient:
         if pair:
             data["pair"] = pair
         logger.info("Canceling orders: order_id=%s pair=%s", order_id, pair)
-        return self._post("/v3/cancel_order", data)
+        return self._ensure_success("/v3/cancel_order", self._post("/v3/cancel_order", data))
 
     def cancel_all_pending(self) -> Dict:
         """Cancel all pending orders across all pairs."""

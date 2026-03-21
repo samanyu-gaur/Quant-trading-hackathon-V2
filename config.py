@@ -11,15 +11,25 @@ Crypto portfolio on Roostoo mock exchange.
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
+from pathlib import Path
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+_ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=_ENV_PATH)
+
+
+def _env(name: str, default: str = "") -> str:
+    """Read env var and normalize accidental whitespace/quotes from .env edits."""
+    value = os.getenv(name, default)
+    if value is None:
+        return default
+    return value.strip().strip('"').strip("'")
 
 # ── Roostoo API credentials ──
-ROOSTOO_API_KEY = os.getenv("ROOSTOO_API_KEY", "")
-ROOSTOO_API_SECRET = os.getenv("ROOSTOO_API_SECRET", "")
-ROOSTOO_BASE_URL = "https://mock-api.roostoo.com"
+ROOSTOO_API_KEY = _env("ROOSTOO_API_KEY", "")
+ROOSTOO_API_SECRET = _env("ROOSTOO_API_SECRET", "")
+ROOSTOO_BASE_URL = _env("ROOSTOO_BASE_URL", "https://mock-api.roostoo.com")
 
 # ── Trading universe ──
 # Top-liquidity pairs on Roostoo that also have Binance historical data.
