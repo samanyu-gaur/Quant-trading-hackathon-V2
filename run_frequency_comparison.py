@@ -60,10 +60,15 @@ def run_single_backtest(rebalance_hours: int, start: str, end: str,
     # Override regime hysteresis for this frequency
     engine.alpha_engine.regime_detector._MIN_HOLD = min_hold
 
-    # Override stop cooldown for this frequency
-    engine._STOP_COOLDOWN_CYCLES = stop_cooldown_cycles
+    # Keep cooldown horizon near 24h regardless of cadence.
+    cooldown_hours = rebalance_hours * stop_cooldown_cycles
+    original_cooldown_hours = cfg.OUTLIER.cooldown_hours
+    cfg.OUTLIER.cooldown_hours = cooldown_hours
 
-    result = engine.run()
+    try:
+        result = engine.run()
+    finally:
+        cfg.OUTLIER.cooldown_hours = original_cooldown_hours
     result["rebalance_hours"] = rebalance_hours
     result["min_hold_cycles"] = min_hold
     result["stop_cooldown_cycles"] = stop_cooldown_cycles

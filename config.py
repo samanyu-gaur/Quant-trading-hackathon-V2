@@ -163,10 +163,34 @@ class SignalParams:
 
 @dataclass
 class RebalanceConfig:
-    frequency_hours: int = 2            # rebalance every 2 hours (best risk-adj composite)
+    frequency_hours: int = 2            # legacy cadence for comparisons/backward compatibility
+    continuous_on_hour_bar: bool = True # live loop runs continuously, executes once per closed 1h bar
+    poll_seconds: int = 60              # loop wake-up interval for event checks
     min_trade_value_usd: float = 50.0   # minimum trade size (reduce noise trades)
     min_weight_change: float = 0.03     # don't trade if weight change < 3%
     max_turnover_pct: float = 0.40      # max 40% turnover per rebalance
+
+
+@dataclass
+class OutlierOverrideConfig:
+    enabled: bool = True
+    cooldown_hours: int = 24
+
+    # Outlier trigger threshold in z-scored alpha space.
+    alpha_z_threshold: float = 2.0
+
+    # Require multiple signals to agree with the outlier direction.
+    min_signal_consensus: int = 3
+
+    # Risk-vs-reward gate: reward quality must exceed risk pressure.
+    min_reward_risk_ratio: float = 1.15
+
+    # Hard risk brakes for bullish cooldown breaks.
+    max_drawdown_for_bull_override: float = 0.12
+    max_corr_for_bull_override: float = 0.80
+
+    # During crash-like correlation, bearish overrides remain allowed.
+    allow_bear_override_in_corr_spike: bool = True
 
 
 @dataclass
@@ -204,4 +228,5 @@ CONSTRAINTS = PortfolioConstraints()
 RISK = RiskParams()
 SIGNALS = SignalParams()
 REBALANCE = RebalanceConfig()
+OUTLIER = OutlierOverrideConfig()
 CRISIS_MODE = CrisisModeConfig()

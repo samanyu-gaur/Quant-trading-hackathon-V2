@@ -811,3 +811,8 @@ class AlphaEngine:
     def adaptive_diagnostics(self) -> Dict:
         """Get adaptive weight diagnostics."""
         return self.signal_weighter.get_diagnostics()
+
+    @property
+    def last_signal_scores(self) -> Dict[str, pd.Series]:
+        """Return most recent raw component signal outputs by signal name."""
+        return self._prev_signal_scores if self._prev_signal_scores is not None else {}
