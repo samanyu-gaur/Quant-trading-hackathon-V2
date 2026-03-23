@@ -864,9 +864,8 @@ class BacktestEngine:
         self.holdings: Dict[str, float] = {}  # {coin: quantity}
         self.entry_prices: Dict[str, float] = {}
 
-        # Stop-loss cooldown: {coin: cycles_remaining}
-        self._stop_cooldown: Dict[str, int] = {}
-        self._STOP_COOLDOWN_CYCLES = 6  # 6 rebalance cycles = 24h cooldown
+        # Stop-loss cooldown: {coin: cooldown_expiry_utc}
+        self._stop_cooldown: Dict[str, pd.Timestamp] = {}
         self._stop_triggered_skip_next = False  # skip next rebalance if stop fired
 
         # 5DMA breakout addon tracking: {coin: {qty, sma_at_buy}}
@@ -1203,7 +1202,7 @@ class BacktestEngine:
                 for coin in stopped_coins:
                     self.holdings.pop(coin, None)
                     self.entry_prices.pop(coin, None)
-                    self._stop_cooldown[coin] = self._STOP_COOLDOWN_CYCLES
+                    self._set_cooldown(coin, ts)
                     self.risk_mgr.reset_position_hwm(coin)
 
                 if stopped_coins:

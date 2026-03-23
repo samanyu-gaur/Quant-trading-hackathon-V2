@@ -1,0 +1,96 @@
+{
+  "status": "OK",
+  "run_id": "20260324_004307",
+  "start": "2026-03-01",
+  "end": "2026-03-19",
+  "rebalance_hours": 2,
+  "adaptive": true,
+  "initial_capital": 100000.0,
+  "final_nav": 108842.25,
+  "total_return_pct": 8.84,
+  "sortino": 0.1067,
+  "sharpe": 0.0768,
+  "calmar": 0.0052,
+  "composite_score": 0.0673,
+  "max_drawdown_pct": 3.85,
+  "rebalance_count": 217,
+  "total_trades": 484,
+  "total_commission": 384.51,
+  "n_coins": 15,
+  "adaptive_diagnostics": {
+    "ic_ir": {
+      "0": {
+        "momentum": -0.0155,
+        "breakout": 0.0137,
+        "volume_momentum": -0.0993,
+        "mean_reversion": 0.1379,
+        "relative_strength": -0.0134
+      },
+      "1": {
+        "momentum": 0.2266,
+        "breakout": 0.146,
+        "volume_momentum": 0.0672,
+        "mean_reversion": -0.0517,
+        "relative_strength": 0.1291
+      },
+      "2": {
+        "momentum": 0.0222,
+        "breakout": 0.1547,
+        "volume_momentum": 0.1909,
+        "mean_reversion": -0.0902,
+        "relative_strength": 0.0842
+      }
+    },
+    "mean_ic": {
+      "0": {
+        "momentum": -0.0043,
+        "breakout": 0.0038,
+        "volume_momentum": -0.029,
+        "mean_reversion": 0.0408,
+        "relative_strength": -0.0033
+      },
+      "1": {
+        "momentum": 0.068,
+        "breakout": 0.0483,
+        "volume_momentum": 0.0224,
+        "mean_reversion": -0.0157,
+        "relative_strength": 0.0432
+      },
+      "2": {
+        "momentum": 0.0068,
+        "breakout": 0.0435,
+        "volume_momentum": 0.0598,
+        "mean_reversion": -0.0293,
+        "relative_strength": 0.0235
+      }
+    },
+    "obs_count": {
+      "0": 69,
+      "1": 82,
+      "2": 59
+    },
+    "current_weights": {
+      "0": {
+        "momentum": 0.3603,
+        "breakout": 0.2402,
+        "volume_momentum": 0.1586,
+        "mean_reversion": 0.1211,
+        "relative_strength": 0.1198
+      },
+      "1": {
+        "momentum": 0.2811,
+        "breakout": 0.2005,
+        "volume_momentum": 0.1595,
+        "mean_reversion": 0.1985,
+        "relative_strength": 0.1604
+      },
+      "2": {
+        "momentum": 0.1625,
+        "breakout": 0.1231,
+        "volume_momentum": 0.1642,
+        "mean_reversion": 0.3057,
+        "relative_strength": 0.2446
+      }
+    }
+  }
+}
